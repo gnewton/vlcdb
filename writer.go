@@ -3,93 +3,39 @@ package vlcdb
 import (
 	"github.com/colinmarc/cdb"
 	"log"
-	"os"
 	"strconv"
 )
 
 type Writer struct {
-	path        string
-	indexWriter *cdb.Writer
-	dataWriter  *cdb.Writer
+	path string
+	//keyIndexWriter *cdb.Writer
+	keyIndexWriter *cdb.Writer
+	dataWriter     *cdb.Writer
 
-	indexCounter      int
-	indexCounterBytes []byte
+	keyIndexCounter      int
+	keyIndexCounterBytes []byte
 
 	dataCounter      int
 	dataCounterBytes []byte
 }
 
+const baseKeyIndexFileName = "index"
+const baseDataFileName = "data"
 const startCounter = 0
 
+var cdbSuffix = ".cdb"
 var startCounterBytes = []byte(strconv.Itoa(startCounter))
-
-func Create(path string) (*Writer, error) {
-
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		err := os.Mkdir(path, 0777)
-		if err != nil {
-			return nil, err
-		}
-	} else { // dir does exist
-		log.Println("Deleting all files")
-		err := deleteAllFilesInDirectory(path)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	writer := Writer{path: path, indexCounter: startCounter, dataCounter: startCounter, indexCounterBytes: startCounterBytes, dataCounterBytes: startCounterBytes}
-
-	//
-	// index
-	err := writer.nextIndex()
-	if err != nil {
-		return nil, err
-	}
-
-	//
-	// data
-	err = writer.nextData()
-	if err != nil {
-		return nil, err
-	}
-
-	//writer := Writer{indexWriter: indexWriter, dataWriter: dataWriter}
-	return &writer, nil
-
-}
-
-func (writer *Writer) Put(key, value []byte) error {
-	err := writer.indexWriter.Put(key, writer.dataCounterBytes)
-	if err != nil {
-		if err == cdb.ErrTooMuchData {
-			err = writer.nextIndex()
-		} else {
-			return err
-		}
-	}
-
-	err = writer.dataWriter.Put(key, value)
-	if err != nil {
-		if err == cdb.ErrTooMuchData {
-			err = writer.nextData()
-		} else {
-			return err
-		}
-	}
-	return nil
-}
 
 func (writer *Writer) nextData() error {
 	if writer.dataWriter != nil {
-		log.Println("Closing data")
+		log.Println("Closing data ", writer.dataCounter-1)
 		err := writer.dataWriter.Close()
 		if err != nil {
 			return nil
 		}
 	}
-	log.Println("Opening new data")
-	dataWriter, err := newWriter(writer.path, "data", writer.dataCounter)
+	log.Println("Opening new data ", writer.dataCounter)
+	dataWriter, err := newWriter(writer.path, baseDataFileName, writer.dataCounter)
 	if err != nil {
 		return nil
 	}
@@ -101,40 +47,32 @@ func (writer *Writer) nextData() error {
 	return nil
 }
 
-func (writer *Writer) nextIndex() error {
-	if writer.indexWriter != nil {
-		log.Println("Closing index")
-		err := writer.indexWriter.Close()
+var keyIndexCounter = 0
+
+func (writer *Writer) nextKeyIndex() error {
+	if writer.keyIndexWriter != nil {
+		log.Println("Closing index ", writer.keyIndexCounter-1)
+		err := writer.keyIndexWriter.Close()
 		if err != nil {
-			return nil
+			return err
 		}
 	}
 
-	log.Println("Opening new index")
-
-	indexWriter, err := newWriter(writer.path, "index", writer.indexCounter)
+	newKeyIndexWriter, err := newWriter(writer.path, baseKeyIndexFileName, writer.keyIndexCounter)
 	if err != nil {
 		return err
 	}
-	writer.indexCounter += 1
-	writer.indexCounterBytes = []byte(strconv.Itoa(writer.indexCounter))
-	writer.indexWriter = indexWriter
+
+	log.Println("Opened new index ", writer.keyIndexCounter)
+	keyIndexCounter += 1
+
+	writer.keyIndexCounter += 1
+	writer.keyIndexCounterBytes = []byte(strconv.Itoa(writer.keyIndexCounter))
+	writer.keyIndexWriter = newKeyIndexWriter
 
 	return nil
 
 }
-
-func (writer *Writer) Close() error {
-	err1 := writer.indexWriter.Close()
-	err2 := writer.dataWriter.Close()
-	if err1 != nil {
-		return err1
-	}
-	return err2
-
-}
-
-var cdbSuffix = ".cdb"
 
 func newWriter(path, name string, counter int) (*cdb.Writer, error) {
 	return cdb.Create(path + pathSep + name + "_" + strconv.Itoa(counter) + cdbSuffix)
