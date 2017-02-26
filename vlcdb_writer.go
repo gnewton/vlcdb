@@ -68,6 +68,7 @@ func (writer *Writer) Put(key, value []byte) error {
 }
 func (writer *Writer) Close() error {
 	err := writer.keyIndexWriter.Close()
+	log.Println("Closing data ", writer.dataCounter-1)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -75,8 +76,11 @@ func (writer *Writer) Close() error {
 	err = writer.dataWriter.Close()
 	if err != nil {
 		log.Println(err)
-
+		return err
 	}
-	return err
+
+	writer.writeConfig()
+
+	return nil
 
 }

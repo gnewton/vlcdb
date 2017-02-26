@@ -75,5 +75,9 @@ func (writer *Writer) nextKeyIndex() error {
 }
 
 func newWriter(path, name string, counter int) (*cdb.Writer, error) {
-	return cdb.Create(path + pathSep + name + "_" + strconv.Itoa(counter) + cdbSuffix)
+	return cdb.Create(makeFileName(path, name, counter))
+}
+
+func makeFileName(path, name string, counter int) string {
+	return path + pathSep + name + "_" + strconv.Itoa(counter) + cdbSuffix
 }
