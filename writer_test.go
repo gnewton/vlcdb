@@ -1,101 +1,156 @@
 package vlcdb_test
 
 import (
-	"github.com/gnewton/vlcdb"
 	"log"
+	"os"
 	"strconv"
 	"testing"
+
+	"github.com/gnewton/vlcdb"
 )
 
-var smallString = "1234567890"
-
-const mediumString = "1234567890123456789012345678901234567890"
-const largeString = "foo nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
-const veryLargeString = "foo nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn foo nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn foo nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn foo nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn foo nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn foo nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn foo nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn foo nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn foo nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn foo nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn foo nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn foo nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn foo nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn foo nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn foo nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn "
-
 func TestWritesRandom(t *testing.T) {
-	_, err := vlcdb.Create("foo")
+	dir, err := tmpDir()
 	if err != nil {
 		log.Println(err)
-		log.Fatal(err)
+		t.Fail()
 	}
+
+	_, err = vlcdb.Create(dir)
+	if err != nil {
+		log.Println(err)
+		t.Fail()
+	}
+	cleanup(dir)
 }
 
-func writeIndex(keys []string, values []string, n int) error {
+func writeIndex(keys []string, values []string, n uint64) (*vlcdb.Config, string, error) {
+
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	writer, err := vlcdb.Create("foo")
+
+	dir, err := tmpDir()
+	if err != nil {
+		return nil, "", err
+	}
+	log.Println("Opening dir: ", dir)
+	writer, err := vlcdb.Create(dir)
 	if err != nil {
 		log.Println(err)
-		return err
+		return nil, "", err
 	}
-	for i := 0; i < n; i++ {
-		si := strconv.Itoa(i)
-		key := []byte(largeString + si)
-		value := key
-		err := writer.Put(key, value)
+	c := kvGenerator(largeString, largeString, n)
+
+	for kv := range c {
+		err := writer.Put(kv.k, kv.v)
 		if err != nil {
-			log.Println(si + " *************************")
 			log.Println(err)
-			return err
+			return nil, "", err
 		}
 	}
 
-	err = writer.Close()
+	config, err := writer.Close()
 	if err != nil {
 		log.Println(err)
-		return err
+		return nil, "", err
 	}
-	return nil
+	return config, dir, nil
 }
 
-func TestNormalUsage(t *testing.T) {
-	writeIndex([]string{smallString}, []string{largeString}, 18569693)
-}
-
-func TestAverageUsage(t *testing.T) {
+func Test_SmallKey_LargeData(t *testing.T) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	writer, err := vlcdb.Create("foo")
+	_, dir, err := writeIndex([]string{smallString}, []string{largeString}, 10569693)
+	defer cleanup(dir)
 	if err != nil {
-		log.Println(err)
+		//t.Fail()
 		log.Fatal(err)
-	}
-	for i := 0; i < 65855000; i++ {
-		si := strconv.Itoa(i)
-		key := []byte(smallString + si)
-		value := []byte(largeString + si)
-		err := writer.Put(key, value)
-		if err != nil {
-			log.Println(si + " *************************")
-			log.Fatal(err)
-		}
 	}
 
-	err = writer.Close()
+}
+
+func Test_SmallKey_SmallData(t *testing.T) {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	_, dir, err := writeIndex([]string{smallString}, []string{smallString}, 10569693)
+	defer cleanup(dir)
 	if err != nil {
-		log.Fatal(err)
+		t.Fail()
 	}
 }
 
-func mmTestLargeKey(t *testing.T) {
+func Test_LargeKey_SmallData(t *testing.T) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	writer, err := vlcdb.Create("foo")
+	_, dir, err := writeIndex([]string{largeString}, []string{smallString}, 8569693)
+	defer cleanup(dir)
+	if err != nil {
+		t.Fail()
+	}
+}
+
+func Test_LargeKey_LargeData(t *testing.T) {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	_, dir, err := writeIndex([]string{largeString}, []string{largeString}, 18123456)
+	defer cleanup(dir)
+	if err != nil {
+		t.Fail()
+	}
+}
+
+func TestVeryLargeKey_VeryLargeData(t *testing.T) {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	_, dir, err := writeIndex([]string{veryLargeString}, []string{veryLargeString}, 8123456)
+	defer cleanup(dir)
+	if err != nil {
+		t.Fail()
+	}
+}
+
+func TestVeryLargeKey_SmallData(t *testing.T) {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	_, dir, err := writeIndex([]string{veryLargeString}, []string{smallString}, 123456)
+	defer cleanup(dir)
+	if err != nil {
+		t.Fail()
+	}
+}
+
+func cleanup(dir string) {
+	log.Println("   Removing tmp dir:", dir)
+	if dir == "" {
+		return
+	}
+	err := os.RemoveAll(dir)
 	if err != nil {
 		log.Println(err)
-		log.Fatal(err)
 	}
-	for i := 0; i < 65855000; i++ {
-		si := strconv.Itoa(i)
-		key := []byte(veryLargeString + si)
-		value := []byte(veryLargeString + si)
-		err := writer.Put(key, value)
-		if err != nil {
-			log.Println(si + " *************************")
-			log.Fatal(err)
-		}
-	}
+}
 
-	err = writer.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
+////////////////////////////////////////////
+
+var smallString = "01234567" // 8
+
+var mediumString = smallString + smallString + smallString + smallString    // 32
+var largeString = mediumString + mediumString + mediumString + mediumString // 128
+
+var veryLargeString = largeString + largeString + largeString + largeString + largeString + largeString + largeString + largeString + largeString + largeString + largeString + largeString + largeString + largeString + largeString + largeString
+
+type keyValue struct {
+	k, v []byte
+}
+
+func kvGenerator(baseKey, baseValue string, n uint64) chan *keyValue {
+	kvChan := make(chan *keyValue, 100)
+
+	go func() {
+		var i uint64
+		for i = 0; i < n; i++ {
+			si := strconv.FormatUint(i, 10)
+			key := []byte(baseKey + si)
+			value := []byte(baseValue + si)
+			kv := keyValue{k: key, v: value}
+
+			kvChan <- (&kv)
+		}
+		close(kvChan)
+	}()
+
+	return kvChan
 }

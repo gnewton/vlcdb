@@ -31,13 +31,15 @@ func (writer *Writer) nextData() error {
 		log.Println("Closing data ", writer.dataCounter-1)
 		err := writer.dataWriter.Close()
 		if err != nil {
-			return nil
+			log.Println(err)
+			return err
 		}
 	}
 	log.Println("Opening new data ", writer.dataCounter)
 	dataWriter, err := newWriter(writer.path, baseDataFileName, writer.dataCounter)
 	if err != nil {
-		return nil
+		log.Println(err)
+		return err
 	}
 
 	writer.dataCounter += 1
@@ -75,9 +77,13 @@ func (writer *Writer) nextKeyIndex() error {
 }
 
 func newWriter(path, name string, counter int) (*cdb.Writer, error) {
-	return cdb.Create(makeFileName(path, name, counter))
+	return cdb.Create(makePathFileName(path, name, counter))
 }
 
-func makeFileName(path, name string, counter int) string {
-	return path + pathSep + name + "_" + strconv.Itoa(counter) + cdbSuffix
+func makePathFileName(path, name string, counter int) string {
+	return path + pathSep + makeFileName(name, counter)
+}
+
+func makeFileName(name string, counter int) string {
+	return name + "_" + strconv.Itoa(counter) + cdbSuffix
 }

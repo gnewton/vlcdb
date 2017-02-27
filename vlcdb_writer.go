@@ -66,21 +66,25 @@ func (writer *Writer) Put(key, value []byte) error {
 	}
 	return nil
 }
-func (writer *Writer) Close() error {
+func (writer *Writer) Close() (*Config, error) {
 	err := writer.keyIndexWriter.Close()
 	log.Println("Closing data ", writer.dataCounter-1)
 	if err != nil {
 		log.Println(err)
-		return err
+		return nil, err
 	}
 	err = writer.dataWriter.Close()
 	if err != nil {
 		log.Println(err)
-		return err
+		return nil, err
 	}
 
-	writer.writeConfig()
+	config, err := writer.writeConfig()
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
 
-	return nil
+	return config, nil
 
 }
