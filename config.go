@@ -1,8 +1,9 @@
 package vlcdb
 
 import (
-	"bufio"
+	"github.com/colinmarc/cdb"
 
+	"bufio"
 	"encoding/json"
 	"io/ioutil"
 	//"errors"
@@ -32,13 +33,37 @@ func open(path string, verify bool) (*CDB, error) {
 		return nil, err
 	}
 
-	//config, err := LoadConfig(path)
-
-	_, err = loadConfigFile(path, verify)
+	config, err := loadConfigFile(path, verify)
 	if err != nil {
 		return nil, err
 	}
-	return nil, nil
+
+	mcdb := new(CDB)
+
+	mcdb.keyIndexes = make([]*cdb.CDB, len(config.KeyIndexFiles))
+
+	for i, f := range config.KeyIndexFiles {
+		fullName := config.path + string(os.PathSeparator) + f.Filename
+		log.Println("++Opening", fullName)
+		realCdb, err := cdb.Open(fullName)
+		if err != nil {
+			return nil, err
+		}
+		mcdb.keyIndexes[i] = realCdb
+	}
+
+	mcdb.data = make([]*cdb.CDB, len(config.DataFiles))
+	for i, f := range config.DataFiles {
+		fullName := config.path + string(os.PathSeparator) + f.Filename
+		log.Println("++Opening", fullName)
+		realCdb, err := cdb.Open(fullName)
+		if err != nil {
+			return nil, err
+		}
+		mcdb.data[i] = realCdb
+	}
+
+	return mcdb, nil
 }
 
 func loadConfigFile(path string, verify bool) (*Config, error) {
