@@ -9,7 +9,7 @@ import (
 	"github.com/gnewton/vlcdb"
 )
 
-func TestWritesRandom(t *testing.T) {
+func TestCreate(t *testing.T) {
 	dir, err := tmpDir()
 	if err != nil {
 		log.Println(err)
@@ -21,6 +21,28 @@ func TestWritesRandom(t *testing.T) {
 		log.Println(err)
 		t.Fail()
 	}
+	cleanup(dir)
+}
+
+func TestCreateAndClose(t *testing.T) {
+	dir, err := tmpDir()
+	if err != nil {
+		log.Println(err)
+		t.Fail()
+	}
+
+	w, err := vlcdb.Create(dir)
+	if err != nil {
+		log.Println(err)
+		t.Fail()
+	}
+
+	_, err = w.Close()
+	if err != nil {
+		log.Println(err)
+		t.Fail()
+	}
+
 	cleanup(dir)
 }
 
