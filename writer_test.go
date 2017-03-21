@@ -81,7 +81,7 @@ func writeIndex(keys []string, values []string, n uint64) (*vlcdb.Config, string
 func Test_SmallKey_LargeData(t *testing.T) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	//_, dir, err := writeIndex([]string{smallString}, []string{largeString}, 10569693)
-	_, _, err := writeIndex([]string{smallString}, []string{largeString}, 10569693)
+	_, _, err := writeIndex([]string{smallString}, []string{largeString}, 1056969)
 	//defer cleanup(dir)
 	if err != nil {
 		t.Fail()

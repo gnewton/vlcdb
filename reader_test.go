@@ -151,7 +151,7 @@ func TestWriteRead(t *testing.T) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	var num uint64 = 80000000
 	_, dir, err := writeIndex([]string{smallString}, []string{smallString}, num)
-	//defer cleanup(dir)
+	defer cleanup(dir)
 	if err != nil {
 		log.Println(err)
 		t.Fail()
