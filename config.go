@@ -3,16 +3,23 @@ package vlcdb
 import (
 	"github.com/colinmarc/cdb"
 
-	"bufio"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
-	//"errors"
 	"log"
 	"os"
 )
 
 const ConfigFileName = "vlcdb.json"
 const version = "1.0"
+
+type VerifyLevel int
+
+const (
+	VerifyNone VerifyLevel = iota
+	VerifyHash             = iota
+	VerifyAll              = 99999
+)
 
 type Config struct {
 	Version       string
@@ -27,13 +34,27 @@ type FileInfo struct {
 	Sha512   string `json:",omitempty"`
 }
 
-func open(path string, verify bool) (*CDB, error) {
+func (v VerifyLevel) String() string {
+	switch v {
+	case VerifyNone:
+		return "VerifyNone"
+	case VerifyHash:
+		return "VerifyHash"
+	}
+	return "VerifyAll"
+}
+
+func open(path string, verifyLevel VerifyLevel) (*CDB, error) {
+	if path == "" {
+		return nil, errors.New("Path is empty")
+	}
+
 	_, err := existsAndIsDir(path)
 	if err != nil {
 		return nil, err
 	}
 
-	config, err := loadConfigFile(path, verify)
+	config, err := loadConfigFile(path, verifyLevel)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +87,11 @@ func open(path string, verify bool) (*CDB, error) {
 	return mcdb, nil
 }
 
-func loadConfigFile(path string, verify bool) (*Config, error) {
+func loadConfigFile(path string, verifyLevel VerifyLevel) (*Config, error) {
+	if path == "" {
+		return nil, errors.New("Path is empty")
+	}
+
 	configFile := path + pathSep + ConfigFileName
 	log.Println("Loading config file:", configFile)
 	jsonBytes, err := ioutil.ReadFile(configFile)
@@ -78,6 +103,7 @@ func loadConfigFile(path string, verify bool) (*Config, error) {
 	config.path = path
 	err = json.Unmarshal(jsonBytes, &config)
 	if err != nil {
+		log.Println(configFile)
 		log.Println(err)
 		return nil, err
 	}
@@ -93,9 +119,9 @@ func loadConfigFile(path string, verify bool) (*Config, error) {
 		log.Println(err)
 		return nil, err
 	}
-	log.Println("Loading config file:", verify)
-	if verify {
-		err = verifyConfig(&config)
+	log.Println("Loading config file:", verifyLevel)
+	if verifyLevel >= VerifyNone {
+		err = verifyConfig(verifyLevel, &config)
 		if err != nil {
 			log.Println(err)
 			return nil, err
@@ -106,85 +132,32 @@ func loadConfigFile(path string, verify bool) (*Config, error) {
 
 }
 
-func verifyConfig(c *Config) error {
-	log.Println(verifyConfig)
-	err := checkHash(c.path, c.KeyIndexFiles)
-	if err != nil {
-		return err
+func verifyConfig(verifyLevel VerifyLevel, c *Config) error {
+	if c == nil {
+		return errors.New("Config is nil")
 	}
 
-	err = checkHash(c.path, c.DataFiles)
-	if err != nil {
-		return err
+	log.Println(verifyConfig)
+
+	switch verifyLevel {
+	case VerifyHash:
+
+		err := checkHash(c.path, c.KeyIndexFiles)
+		if err != nil {
+			return err
+		}
+
+		err = checkHash(c.path, c.DataFiles)
+		if err != nil {
+			return err
+		}
+		if verifyLevel >= VerifyAll {
+
+		}
+		fallthrough
+	case VerifyAll:
+		// should iterate all keys of all files; in parallel?
 	}
 	return nil
-}
 
-func (writer *Writer) writeConfig() (*Config, error) {
-	log.Println("WriteConfig")
-	f, err := os.Create(writer.path + pathSep + ConfigFileName)
-	if err != nil {
-		log.Println(err)
-		return nil, err
-	}
-	defer f.Close()
-
-	config := Config{Version: version}
-
-	config.KeyIndexFiles = make([]*FileInfo, writer.keyIndexCounter)
-
-	for i := 0; i < writer.keyIndexCounter; i++ {
-		fileInfo := new(FileInfo)
-		fileInfo.Filename = makeFileName(baseKeyIndexFileName, i)
-
-		var err error
-		fileInfo.Sha512, err = makeSha512(makePathFileName(writer.path, baseKeyIndexFileName, i))
-		if err != nil {
-			log.Println(err)
-			return nil, err
-		}
-		f, err := exists(makePathFileName(writer.path, baseKeyIndexFileName, i))
-		if err != nil {
-			log.Println(err)
-			return nil, err
-		}
-		fileInfo.Size = f.Size()
-
-		config.KeyIndexFiles[i] = fileInfo
-	}
-
-	config.DataFiles = make([]*FileInfo, writer.dataCounter)
-	for i := 0; i < writer.dataCounter; i++ {
-		fileInfo := new(FileInfo)
-		fileInfo.Filename = makeFileName(baseDataFileName, i)
-		fileInfo.Sha512, err = makeSha512(makePathFileName(writer.path, baseDataFileName, i))
-		if err != nil {
-			log.Println(err)
-			return nil, err
-		}
-
-		f, err := exists(makePathFileName(writer.path, baseDataFileName, i))
-		if err != nil {
-			log.Println(err)
-			return nil, err
-		}
-		fileInfo.Size = f.Size()
-		config.DataFiles[i] = fileInfo
-	}
-
-	w := bufio.NewWriter(f)
-	b, err := json.MarshalIndent(config, "", "\t")
-	if err != nil {
-		log.Println(err)
-		return nil, err
-	}
-
-	_, err = w.Write(b)
-	if err != nil {
-		log.Println(err)
-		return nil, err
-	}
-	w.Flush()
-
-	return &config, nil
 }

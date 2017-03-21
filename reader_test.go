@@ -1,20 +1,22 @@
 package vlcdb_test
 
 import (
-	"github.com/gnewton/vlcdb"
+	"errors"
 	"io/ioutil"
 	"log"
 	"os"
 	"testing"
+
+	"github.com/gnewton/vlcdb"
 )
 
 const badDir = "/adsfasdfasdasfdasdf/adsfasfd"
 
 func TestBadPath(t *testing.T) {
-	_, err := vlcdb.Open(badDir, false)
+	_, err := vlcdb.Open(badDir, vlcdb.VerifyNone)
 	if err == nil {
 		log.Println(err)
-		log.Fatal(err)
+		t.Fail()
 	}
 }
 
@@ -22,10 +24,11 @@ func TestNoConfigFile(t *testing.T) {
 	dir, err := tmpDir()
 	defer cleanup(dir)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		t.Fail()
 	}
 
-	_, err = vlcdb.Open(dir, false)
+	_, err = vlcdb.Open(dir, vlcdb.VerifyNone)
 	if err == nil {
 		t.Fail()
 	}
@@ -36,17 +39,18 @@ func TestGoodConfigFile(t *testing.T) {
 	dir, err := tmpDir()
 	defer cleanup(dir)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		t.Fail()
 	}
 
 	configFile := dir + string(os.PathSeparator) + vlcdb.ConfigFileName
 	err = ioutil.WriteFile(configFile, []byte(validJsonConfig), 0777)
 	if err != nil {
 		log.Println(err)
-		log.Fatal(err)
+		t.Fail()
 	}
 
-	_, err = vlcdb.Open(dir, false) //	_, err = vlcdb.LoadConfig(dir)
+	_, err = vlcdb.Open(dir, vlcdb.VerifyNone) //	_, err = vlcdb.LoadConfig(dir)
 	if err == nil {
 		t.Fail()
 	}
@@ -57,17 +61,18 @@ func TestMissingStoreFiles(t *testing.T) {
 	dir, err := tmpDir()
 	defer cleanup(dir)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		t.Fail()
 	}
 
 	configFile := dir + string(os.PathSeparator) + vlcdb.ConfigFileName
 	err = ioutil.WriteFile(configFile, []byte(validJsonConfig), 0777)
 	if err != nil {
 		log.Println(err)
-		log.Fatal(err)
+		t.Fail()
 	}
 
-	_, err = vlcdb.Open(dir, false)
+	_, err = vlcdb.Open(dir, vlcdb.VerifyNone)
 	if err == nil {
 		t.Fail()
 	}
@@ -79,18 +84,20 @@ func TestBadConfigFile(t *testing.T) {
 	dir, err := tmpDir()
 	defer cleanup(dir)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		t.Fail()
 	}
 
 	configFile := dir + string(os.PathSeparator) + vlcdb.ConfigFileName
 	err = ioutil.WriteFile(configFile, []byte("foo bnar \"\" / ,,,,"), 0777)
 	if err != nil {
 		log.Println(err)
-		log.Fatal(err)
+		t.Fail()
 	}
 
-	_, err = vlcdb.Open(dir, false)
+	_, err = vlcdb.Open(dir, vlcdb.VerifyNone)
 	if err == nil {
+		log.Println(err)
 		t.Fail()
 
 	}
@@ -106,7 +113,7 @@ func TestGoodIndexesUnVerified(t *testing.T) {
 		t.Fail()
 	}
 	//_, err = vlcdb.Open(dir, true)
-	_, err = vlcdb.Open(dir, false)
+	_, err = vlcdb.Open(dir, vlcdb.VerifyNone)
 
 	if err != nil {
 		log.Println(err)
@@ -124,8 +131,33 @@ func TestGoodIndexesVerified(t *testing.T) {
 		log.Println(err)
 		t.Fail()
 	}
-	//_, err = vlcdb.Open(dir, true)
-	_, err = vlcdb.Open(dir, true)
+
+	err = removeConfigFile(dir)
+	if err != nil {
+		log.Println(err)
+		t.Fail()
+	}
+
+	_, err = vlcdb.Open(dir, vlcdb.VerifyAll)
+
+	if err != nil {
+		log.Println(err)
+		t.Fail()
+	}
+
+}
+
+func TestWriteRead(t *testing.T) {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	var num uint64 = 80000000
+	_, dir, err := writeIndex([]string{smallString}, []string{smallString}, num)
+	//defer cleanup(dir)
+	if err != nil {
+		log.Println(err)
+		t.Fail()
+	}
+
+	err = readIndex(dir, []string{smallString}, []string{smallString}, num)
 
 	if err != nil {
 		log.Println(err)
@@ -141,6 +173,50 @@ func tmpDir() (string, error) {
 	}
 	log.Println("Created tmp dir:", dir)
 	return dir, nil
+}
+
+func removeConfigFile(dir string) error {
+	if dir == "" {
+		return errors.New("Empty directory")
+	}
+
+	return nil
+}
+
+func readIndex(dir string, keys []string, values []string, n uint64) error {
+
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
+	log.Println("Opening dir: ", dir)
+	cdb, err := vlcdb.Open(dir, vlcdb.VerifyAll)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	c := kvGenerator(keys, values, n)
+
+	for kv := range c {
+		value := cdb.Get(kv.k)
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+		if value == nil {
+			log.Println("Value:", string(kv.k))
+			return errors.New("Unable to find value that should be foundable")
+		}
+
+		if string(kv.v) != string(value) {
+			log.Println("Incorrect value", string(value), "!=", string(kv.v))
+		}
+
+	}
+	err = cdb.Close()
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	return nil
 }
 
 const validJsonConfig = `

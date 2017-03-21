@@ -1,12 +1,11 @@
 package vlcdb_test
 
 import (
+	"github.com/gnewton/vlcdb"
 	"log"
 	"os"
 	"strconv"
 	"testing"
-
-	"github.com/gnewton/vlcdb"
 )
 
 func TestCreate(t *testing.T) {
@@ -60,7 +59,8 @@ func writeIndex(keys []string, values []string, n uint64) (*vlcdb.Config, string
 		log.Println(err)
 		return nil, "", err
 	}
-	c := kvGenerator(largeString, largeString, n)
+	//c := kvGenerator(largeString, largeString, n)
+	c := kvGenerator(keys, values, n)
 
 	for kv := range c {
 		err := writer.Put(kv.k, kv.v)
@@ -80,11 +80,12 @@ func writeIndex(keys []string, values []string, n uint64) (*vlcdb.Config, string
 
 func Test_SmallKey_LargeData(t *testing.T) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	_, dir, err := writeIndex([]string{smallString}, []string{largeString}, 10569693)
-	defer cleanup(dir)
+	//_, dir, err := writeIndex([]string{smallString}, []string{largeString}, 10569693)
+	_, _, err := writeIndex([]string{smallString}, []string{largeString}, 10569693)
+	//defer cleanup(dir)
 	if err != nil {
-		//t.Fail()
-		log.Fatal(err)
+		t.Fail()
+
 	}
 
 }
@@ -109,7 +110,7 @@ func Test_LargeKey_SmallData(t *testing.T) {
 
 func Test_LargeKey_LargeData(t *testing.T) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	_, dir, err := writeIndex([]string{largeString}, []string{largeString}, 18123456)
+	_, dir, err := writeIndex([]string{largeString}, []string{largeString}, 1812345)
 	defer cleanup(dir)
 	if err != nil {
 		t.Fail()
@@ -118,7 +119,7 @@ func Test_LargeKey_LargeData(t *testing.T) {
 
 func TestVeryLargeKey_VeryLargeData(t *testing.T) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	_, dir, err := writeIndex([]string{veryLargeString}, []string{veryLargeString}, 8123456)
+	_, dir, err := writeIndex([]string{veryLargeString}, []string{veryLargeString}, 81234)
 	defer cleanup(dir)
 	if err != nil {
 		t.Fail()
@@ -128,6 +129,15 @@ func TestVeryLargeKey_VeryLargeData(t *testing.T) {
 func TestVeryLargeKey_SmallData(t *testing.T) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	_, dir, err := writeIndex([]string{veryLargeString}, []string{smallString}, 123456)
+	defer cleanup(dir)
+	if err != nil {
+		t.Fail()
+	}
+}
+
+func TestMixedKeys_MixedValues(t *testing.T) {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	_, dir, err := writeIndex([]string{smallString, mediumString, largeString, veryLargeString}, []string{smallString, mediumString, largeString, veryLargeString, smallString}, 123456)
 	defer cleanup(dir)
 	if err != nil {
 		t.Fail()
@@ -158,17 +168,19 @@ type keyValue struct {
 	k, v []byte
 }
 
-func kvGenerator(baseKey, baseValue string, n uint64) chan *keyValue {
+func kvGenerator(baseKeys, baseValues []string, n uint64) chan *keyValue {
 	kvChan := make(chan *keyValue, 100)
 
 	go func() {
 		var i uint64
+		keyLen := uint64(len(baseKeys))
+		valueLen := uint64(len(baseValues))
 		for i = 0; i < n; i++ {
 			si := strconv.FormatUint(i, 10)
-			key := []byte(baseKey + si)
-			value := []byte(baseValue + si)
-			kv := keyValue{k: key, v: value}
+			key := []byte(si + "_" + baseKeys[i%keyLen])
+			value := []byte(si + "_" + baseValues[i%valueLen])
 
+			kv := keyValue{k: key, v: value}
 			kvChan <- (&kv)
 		}
 		close(kvChan)

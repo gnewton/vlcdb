@@ -81,6 +81,7 @@ func filesExistAndSane(path string, files []*FileInfo) error {
 func checkHash(path string, files []*FileInfo) error {
 	for _, f := range files {
 		filename := path + pathSep + f.Filename
+		log.Println("  Verifying SHA512 of file:", filename)
 		sha512, err := makeSha512(filename)
 		if err != nil {
 			return err

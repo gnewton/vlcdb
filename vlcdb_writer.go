@@ -42,13 +42,33 @@ func Create(path string) (*Writer, error) {
 
 }
 func (writer *Writer) Put(key, value []byte) error {
-	err := writer.keyIndexWriter.Put(key, writer.dataCounterBytes)
+	// write [key,value] to the current data file
+	err := writer.dataWriter.Put(key, value)
 	if err != nil {
+		// Spilling over max file length of cdb for data?
+		if err == cdb.ErrTooMuchData {
+			// make new cdb for data
+			err = writer.nextData()
+			if err != nil {
+				log.Println(err)
+				return err
+			} else {
+				// write data by calling Put again
+				return writer.Put(key, value)
+			}
+		}
+	}
+
+	err = writer.keyIndexWriter.Put(key, writer.dataCounterBytes)
+	if err != nil {
+		// Spilling over max file length of cdb for index?
 		if err == cdb.ErrTooMuchData {
 			log.Println(err)
+			// make new cdb for index
 			err = writer.nextKeyIndex()
 			if err != nil {
-				return err
+				// write index by calling Put again
+				return writer.Put(key, value)
 			}
 		} else {
 			log.Println(err)
@@ -56,14 +76,6 @@ func (writer *Writer) Put(key, value []byte) error {
 		}
 	}
 
-	err = writer.dataWriter.Put(key, value)
-	if err != nil {
-		if err == cdb.ErrTooMuchData {
-			err = writer.nextData()
-		} else {
-			return err
-		}
-	}
 	return nil
 }
 func (writer *Writer) Close() (*Config, error) {
